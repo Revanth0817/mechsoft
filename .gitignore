@@ -1,0 +1,27 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# NuGet
+*.nupkg
+**/packages/*
+!**/packages/build/
+
+# Local tooling / secrets (never committed; real secrets live in `dotnet user-secrets`)
+*.env
+appsettings.*.local.json
+
+# OS files
+.DS_Store
+Thumbs.db

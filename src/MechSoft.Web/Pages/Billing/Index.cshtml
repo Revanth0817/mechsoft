@@ -1,0 +1,47 @@
+@page "/Billing"
+@model MechSoft.Web.Pages.Billing.IndexModel
+@{
+    ViewData["Title"] = "Billing";
+}
+
+<div class="space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="text-xl font-semibold text-slate-900">Billing</h1>
+            <p class="text-sm text-slate-500">Tax invoices raised against customers.</p>
+        </div>
+        <a href="/Billing/Edit" class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New Invoice</a>
+    </div>
+
+    <div class="rounded-lg border border-slate-200 bg-white overflow-hidden">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+                <tr>
+                    <th class="px-4 py-2 text-left">Invoice ID</th>
+                    <th class="px-4 py-2 text-left">Customer</th>
+                    <th class="px-4 py-2 text-left">Date</th>
+                    <th class="px-4 py-2 text-left">Amount</th>
+                    <th class="px-4 py-2"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                @foreach (var inv in Model.Invoices)
+                {
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-2 font-medium text-slate-900">@inv.Id</td>
+                        <td class="px-4 py-2 text-slate-700">@inv.CustomerCompany</td>
+                        <td class="px-4 py-2 text-slate-700">@inv.InvoiceDate.ToString("dd MMM yyyy")</td>
+                        <td class="px-4 py-2 text-slate-700">@CurrencyFormatter.Format(inv.TotalValue)</td>
+                        <td class="px-4 py-2 text-right">
+                            <a href="/Billing/Edit?id=@inv.Id" class="text-sky-700 hover:underline">Open</a>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Invoices.Any())
+                {
+                    <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No invoices yet.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mechsoft-web",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/MechSoft.Web", "--urls", "http://localhost:5069"],
+      "port": 5069
+    }
+  ]
+}

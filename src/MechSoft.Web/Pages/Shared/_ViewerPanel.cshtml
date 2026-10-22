@@ -1,0 +1,37 @@
+@{
+    // 3D model viewer used by /Viewer. All rendering happens client-side.
+}
+<div data-viewer-panel data-category="Valvetrain" data-material="-" data-autoload-id="@ViewData["AutoLoadId"]" class="!mt-0 fixed inset-0 z-50 hidden flex-col bg-white">
+    <!-- Full-screen popup header -->
+    <div class="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-900 px-4 py-2.5 text-white">
+        <div class="min-w-0">
+            <div class="text-[11px] uppercase tracking-wide text-slate-400">3D Model Viewer</div>
+            <div data-cad-title class="truncate text-sm font-semibold"></div>
+        </div>
+        <div class="flex shrink-0 items-center gap-4">
+            <div class="flex items-center overflow-hidden rounded-md border border-slate-600" role="group" aria-label="Zoom">
+                <button type="button" data-zoom-out title="Zoom out" aria-label="Zoom out" class="px-3 py-1 text-base font-semibold leading-none hover:bg-slate-800">&minus;</button>
+                <button type="button" data-zoom-in title="Zoom in" aria-label="Zoom in" class="border-l border-slate-600 px-3 py-1 text-base font-semibold leading-none hover:bg-slate-800">+</button>
+            </div>
+            <label class="flex cursor-pointer items-center gap-2 text-xs font-medium"><input type="checkbox" data-cad-autorotate class="h-4 w-4" /> Auto-rotate</label>
+            <button type="button" data-viewer-close class="rounded-md border border-slate-600 px-3 py-1.5 text-xs font-semibold hover:bg-slate-800">&times; Close (Esc)</button>
+        </div>
+    </div>
+
+    <!-- 3D Model panel -->
+    <div data-panel="3d" class="min-h-0 flex-1">
+        <div class="relative h-full min-h-0">
+            <div data-cad-canvas class="cad-canvas-host h-full w-full"></div>
+            <div data-aps-host class="hidden absolute inset-0 bg-white"></div>
+            <div data-cad-unsupported class="hidden absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-50 p-6 text-center text-sm">
+                <div class="font-medium text-slate-700">Unsupported format for in-browser preview</div>
+                <div class="max-w-md text-slate-500" data-unsupported-msg></div>
+                <div class="text-xs text-slate-400"><span data-unsupported-name></span></div>
+                <div class="text-xs text-slate-400">Format: <span data-unsupported-ext></span> &middot; Size: <span data-unsupported-size></span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module" src="~/js/viewer-panel.js" asp-append-version="true"></script>

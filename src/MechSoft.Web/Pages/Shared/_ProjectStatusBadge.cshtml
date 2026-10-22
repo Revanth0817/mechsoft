@@ -1,0 +1,22 @@
+@model ProjectStatus
+@{
+    string label = Model switch
+    {
+        ProjectStatus.Planning => "Planning",
+        ProjectStatus.InProgress => "In Progress",
+        ProjectStatus.Testing => "Testing",
+        ProjectStatus.OnHold => "On Hold",
+        ProjectStatus.Completed => "Completed",
+        _ => Model.ToString(),
+    };
+    string classes = Model switch
+    {
+        ProjectStatus.Planning => "bg-slate-100 text-slate-600 ring-slate-400/20",
+        ProjectStatus.InProgress => "bg-sky-50 text-sky-700 ring-sky-600/20",
+        ProjectStatus.Testing => "bg-violet-50 text-violet-700 ring-violet-600/20",
+        ProjectStatus.OnHold => "bg-amber-50 text-amber-700 ring-amber-600/20",
+        ProjectStatus.Completed => "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+        _ => "bg-slate-50 text-slate-700 ring-slate-600/20",
+    };
+}
+<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset @classes">@label</span>

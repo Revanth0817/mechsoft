@@ -1,0 +1,175 @@
+@page "/Quotes/Edit"
+@model MechSoft.Web.Pages.Quotes.EditModel
+@{
+    ViewData["Title"] = Model.IsNew ? "New Quote" : $"Quote {Model.Form.Id}";
+    var json = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+}
+
+<div class="space-y-4">
+    <div class="no-print flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="text-xl font-semibold text-slate-900">@(Model.IsNew ? "New Quote" : $"Quote {Model.Form.Id}")</h1>
+            <a href="/Quotes" class="text-sm text-sky-700 hover:underline">&larr; Back to Quote Preparation</a>
+        </div>
+        <div class="flex items-center gap-2">
+            @if (!Model.IsNew && Model.Form.ConvertedInvoiceId is { } invId)
+            {
+                <a href="/Billing/Edit?id=@invId" class="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100">View Invoice @invId</a>
+            }
+            else if (!Model.IsNew)
+            {
+                <button type="submit" form="convertForm" class="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100">Convert to Invoice</button>
+            }
+            @if (!Model.IsNew)
+            {
+                <a href="?handler=Pdf&id=@Model.Form.Id" target="_blank" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Download PDF</a>
+            }
+            else
+            {
+                <span title="Save first to download a PDF" class="cursor-not-allowed rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-400">Download PDF</span>
+            }
+        </div>
+    </div>
+
+    <form method="post" id="docForm" x-data="invoiceEditor(@(System.Text.Json.JsonSerializer.Serialize(Model.Form.Lines, json)), 0, 0)">
+        <input type="hidden" asp-for="Form.Id" />
+        <input type="hidden" asp-for="Form.ConvertedInvoiceId" />
+        <div class="print-area mx-auto max-w-4xl rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
+
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div class="flex min-h-[8rem] items-center justify-center rounded-lg border-2 border-dashed border-slate-200 bg-slate-50">
+                    <div class="text-center">
+                        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-slate-900 text-lg font-bold text-white">MS</div>
+                        <div class="mt-1 text-xs font-medium text-slate-500">@Model.Form.CompanyName</div>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <div class="rounded-md border border-slate-200 px-4 py-2 text-right text-3xl font-extrabold tracking-tight text-slate-300">Quotation</div>
+                    <div class="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm">
+                        <span class="font-medium text-slate-700">Quote no.:</span>
+                        <span class="font-semibold text-slate-900">@(Model.IsNew ? "(auto)" : Model.Form.Id)</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm">
+                        <span class="font-medium text-slate-700">Quote date:</span>
+                        <input asp-for="Form.QuoteDate" type="date" class="w-36 border-0 bg-transparent p-0 text-right text-sm focus:outline-none" />
+                    </div>
+                    <div class="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm">
+                        <span class="font-medium text-slate-700">Valid till:</span>
+                        <input asp-for="Form.ValidUntil" type="date" class="w-36 border-0 bg-transparent p-0 text-right text-sm focus:outline-none" />
+                    </div>
+                    <div class="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm">
+                        <span class="font-medium text-slate-700">Status:</span>
+                        <select asp-for="Form.Status" asp-items="Html.GetEnumSelectList<QuoteStatus>()" class="border-0 bg-transparent p-0 text-right text-sm focus:outline-none"></select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div>
+                    <div class="mb-2 text-sm font-bold text-slate-900">Bill From</div>
+                    <input asp-for="Form.CompanyName" placeholder="Your Business Name" class="mb-2 block w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold" />
+                    <div class="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <input asp-for="Form.CompanyMobile" placeholder="Phone" class="block w-full rounded border border-slate-200 bg-white px-2 py-1 text-sm" />
+                        <input asp-for="Form.CompanyEmail" placeholder="Email" class="block w-full rounded border border-slate-200 bg-white px-2 py-1 text-sm" />
+                        <input asp-for="Form.CompanyWebsite" placeholder="Website" class="block w-full rounded border border-slate-200 bg-white px-2 py-1 text-sm" />
+                        <textarea asp-for="Form.CompanyAddress" placeholder="Address" rows="2" class="block w-full resize-none rounded border border-slate-200 bg-white px-2 py-1 text-sm"></textarea>
+                    </div>
+                </div>
+                <div>
+                    <div class="mb-2 text-right text-sm font-bold text-slate-900">Quote To</div>
+                    <input asp-for="Form.CustomerCompany" placeholder="Company" class="mb-2 block w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-right text-sm font-semibold" />
+                    <div class="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <input asp-for="Form.CustomerName" placeholder="Contact Name" class="block w-full rounded border border-slate-200 bg-white px-2 py-1 text-sm text-right" />
+                        <input asp-for="Form.CustomerEmail" placeholder="Email" class="block w-full rounded border border-slate-200 bg-white px-2 py-1 text-sm text-right" />
+                        <textarea asp-for="Form.CustomerAddress" placeholder="Address" rows="2" class="block w-full resize-none rounded border border-slate-200 bg-white px-2 py-1 text-right text-sm"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <label class="text-xs text-slate-500">GSTIN
+                    <input asp-for="Form.Gstin" class="mt-1 block w-full rounded border border-slate-200 px-2 py-1 text-sm" />
+                </label>
+                <label class="text-xs text-slate-500">PAN
+                    <input asp-for="Form.Pan" class="mt-1 block w-full rounded border border-slate-200 px-2 py-1 text-sm" />
+                </label>
+            </div>
+
+            <!-- Line items -->
+            <div class="mt-6 overflow-x-auto">
+                <table class="min-w-full text-sm" id="lineTable">
+                    <thead>
+                        <tr class="bg-blue-600 text-xs font-bold uppercase text-white">
+                            <th class="px-3 py-2.5 text-left">Description</th>
+                            <th class="px-3 py-2.5 text-right">Rate, INR</th>
+                            <th class="px-3 py-2.5 text-right">Qty</th>
+                            <th class="px-3 py-2.5 text-right">Tax %</th>
+                            <th class="px-3 py-2.5 text-right">Amount, INR</th>
+                            <th class="no-print w-16 px-2 py-2.5"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(line, index) in lines" :key="index">
+                            <tr class="border-b border-slate-100 align-top">
+                                <td class="px-3 py-2">
+                                    <div class="flex gap-2">
+                                        <input :name="`Form.Lines[${index}].PartNo`" x-model="line.partNo" placeholder="Part no." class="w-28 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm" />
+                                        <input :name="`Form.Lines[${index}].Description`" x-model="line.description" placeholder="Title" class="min-w-[10rem] flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm" />
+                                    </div>
+                                </td>
+                                <td class="px-3 py-2"><input :name="`Form.Lines[${index}].Rate`" x-model.number="line.rate" type="number" step="0.01" class="w-28 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-right text-sm" /></td>
+                                <td class="px-3 py-2">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <input :name="`Form.Lines[${index}].Qty`" x-model.number="line.qty" type="number" step="0.001" class="w-20 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-right text-sm" />
+                                        <input :name="`Form.Lines[${index}].Unit`" x-model="line.unit" class="w-14 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm" />
+                                    </div>
+                                </td>
+                                <td class="px-3 py-2"><input :name="`Form.Lines[${index}].GstPercent`" x-model.number="line.gstPercent" type="number" step="0.01" class="w-20 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-right text-sm" /></td>
+                                <td class="whitespace-nowrap px-3 py-2 pt-3 text-right font-medium text-slate-900" x-text="fmt(lineAmount(line))"></td>
+                                <td class="no-print px-2 py-2 pt-3 text-right"><button type="button" @@click="removeRow(index)" class="text-xs text-red-600 hover:underline">Remove</button></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+                <button type="button" @@click="addRow()" class="no-print mt-3 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">+ New Item</button>
+            </div>
+
+            <!-- Notes + totals -->
+            <div class="mt-8 grid grid-cols-1 gap-8 border-t border-slate-200 pt-6 sm:grid-cols-2">
+                <div>
+                    <div class="mb-2 text-sm font-bold text-slate-900">Terms or other notes</div>
+                    <textarea asp-for="Form.Notes" rows="6" placeholder="Payment terms, delivery, validity..." class="block w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"></textarea>
+                </div>
+                <div class="space-y-2 text-sm">
+                    <div class="flex items-center justify-between px-1">
+                        <span class="font-semibold text-slate-800">Subtotal</span>
+                        <span class="font-semibold text-slate-900" x-text="fmt(subtotal())"></span>
+                    </div>
+                    <div class="flex items-center justify-between px-1">
+                        <span class="font-semibold text-slate-800">Taxes</span>
+                        <span class="text-slate-600" x-text="fmt(taxes())"></span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-md bg-blue-50 px-3 py-3">
+                        <span class="font-bold text-slate-900">Total</span>
+                        <span class="text-lg font-bold text-slate-900" x-text="fmt(balanceDue())"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 grid grid-cols-1 sm:grid-cols-3">
+                <label class="text-xs text-slate-500 sm:col-start-3">Authorized Signatory
+                    <input asp-for="Form.Signatory" class="mt-1 block w-full rounded border border-slate-200 px-2 py-1 text-sm" />
+                </label>
+            </div>
+        </div>
+
+        <div class="no-print mx-auto mt-4 flex max-w-4xl justify-end">
+            <button type="submit" class="rounded-md bg-slate-900 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800">Save Quote</button>
+        </div>
+    </form>
+</div>
+
+@if (!Model.IsNew && Model.Form.ConvertedInvoiceId is null)
+{
+    <form method="post" asp-page-handler="Convert" id="convertForm"><input type="hidden" name="Form.Id" value="@Model.Form.Id" /></form>
+}

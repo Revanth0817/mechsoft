@@ -1,0 +1,216 @@
+/* Global helpers layered on top of the Tailwind CDN play script. */
+
+html, body {
+    height: 100%;
+}
+
+body {
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* ------------------------------------------------------------------ */
+/* App shell: sidebar, header, main canvas                             */
+/* ------------------------------------------------------------------ */
+
+.app-sidebar {
+    background: linear-gradient(180deg, #0f172a 0%, #0b1324 100%);
+    box-shadow: 1px 0 0 rgba(255, 255, 255, 0.04), 4px 0 24px -8px rgba(2, 6, 23, 0.6);
+}
+
+.brand-mark {
+    background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+    box-shadow: 0 6px 16px -4px rgba(14, 165, 233, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.nav-icon {
+    width: 1.1rem;
+    height: 1.1rem;
+    flex-shrink: 0;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.nav-link-active {
+    background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
+    color: #fff;
+    box-shadow: 0 4px 14px -4px rgba(14, 165, 233, 0.55);
+}
+
+.nav-link-inactive {
+    color: #cbd5e1;
+}
+
+.nav-link-inactive:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    transform: translateX(2px);
+}
+
+.app-header {
+    background-color: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.avatar-chip {
+    background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+    box-shadow: 0 2px 6px -1px rgba(99, 102, 241, 0.5);
+}
+
+.app-main {
+    background:
+        radial-gradient(60rem 30rem at 100% -10%, rgba(14, 165, 233, 0.06), transparent 60%),
+        #f8fafc;
+}
+
+/* ------------------------------------------------------------------ */
+/* Global card / interactive polish                                    */
+/* Targets the exact class combinations already used across every page */
+/* (no per-page markup changes needed).                                */
+/* ------------------------------------------------------------------ */
+
+.rounded-lg.border.border-slate-200.bg-white {
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+    transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+}
+
+a.rounded-lg.border.border-slate-200.bg-white:hover,
+button.rounded-lg.border.border-slate-200.bg-white:hover {
+    box-shadow: 0 8px 20px -6px rgba(15, 23, 42, 0.12);
+    border-color: #cbd5e1;
+}
+
+/* Buttons and nav-style anchors with a solid fill get a gentle lift on hover. */
+button[class*="bg-"]:not(:disabled):not([class*="bg-white"]):not([class*="bg-slate-50"]):not([class*="bg-slate-100"]),
+a[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-slate-50"]):not([class*="bg-slate-100"]) {
+    transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease, background-color 0.12s ease;
+}
+
+button[class*="bg-"]:not(:disabled):not([class*="bg-white"]):not([class*="bg-slate-50"]):not([class*="bg-slate-100"]):hover,
+a[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-slate-50"]):not([class*="bg-slate-100"]):hover {
+    transform: translateY(-1px);
+    filter: brightness(1.04);
+}
+
+button[class*="bg-"]:not(:disabled):active,
+a[class*="bg-"]:active {
+    transform: translateY(0);
+}
+
+/* Thin, unobtrusive scrollbars inside the app's scroll panels (WebKit/Chromium). */
+.overflow-y-auto::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar,
+.app-main::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track,
+.overflow-x-auto::-webkit-scrollbar-track,
+.app-main::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb,
+.overflow-x-auto::-webkit-scrollbar-thumb,
+.app-main::-webkit-scrollbar-thumb {
+    background-color: rgba(100, 116, 139, 0.35);
+    border-radius: 9999px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover,
+.overflow-x-auto::-webkit-scrollbar-thumb:hover,
+.app-main::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(100, 116, 139, 0.55);
+}
+
+/* Table rows already use hover:bg-slate-50; add a quick color transition so it's not an abrupt snap. */
+tbody tr {
+    transition: background-color 0.1s ease;
+}
+
+/* Hide Alpine.js-controlled elements until Alpine has initialized them,
+   so conditionally-shown content (e.g. the overage warning) doesn't flash. */
+[x-cloak] {
+    display: none !important;
+}
+
+/* Isolates a single .print-area element so "Download PDF" (browser print)
+   outputs only that document, mirroring the original PrintStyles component. */
+@media print {
+    /* Chrome/Edge skip CSS background colors when printing unless told
+       otherwise, which drops the logo tile, status badges, and buttons
+       down to plain text. Force them to print as designed. */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    body * {
+        visibility: hidden;
+    }
+
+    .print-area, .print-area * {
+        visibility: visible;
+    }
+
+    .print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 20px;
+        max-width: 100% !important;
+        max-height: none !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+
+    input, textarea, select {
+        border-color: transparent !important;
+    }
+
+    /* The line-items table scrolls horizontally on screen; in print that
+       clips the right-hand columns and bakes the scrollbar into the page.
+       Let it lay out at full width instead, with cells sized to content. */
+    .print-area .overflow-x-auto {
+        overflow: visible !important;
+    }
+
+    .print-area table {
+        width: 100% !important;
+        table-layout: auto !important;
+    }
+
+    .print-area table input,
+    .print-area table select {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+}
+
+.cad-canvas-host {
+    touch-action: none;
+    cursor: grab;
+}
+.cad-canvas-host:active {
+    cursor: grabbing;
+}

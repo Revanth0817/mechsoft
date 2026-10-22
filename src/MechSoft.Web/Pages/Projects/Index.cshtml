@@ -1,0 +1,295 @@
+@page "/Projects"
+@model MechSoft.Web.Pages.Projects.IndexModel
+@{
+    ViewData["Title"] = "Projects";
+
+    string DaysLabel(DateTime? target, ProjectStatus status)
+    {
+        if (status == ProjectStatus.Completed) return "Completed";
+        if (target is null) return "No target date";
+        var days = (target.Value.Date - DateTime.Today).Days;
+        if (days < 0) return $"{-days} day{(days == -1 ? "" : "s")} overdue";
+        if (days == 0) return "Due today";
+        return $"{days} day{(days == 1 ? "" : "s")} left";
+    }
+
+    string BarColor(int pct) => pct >= 100 ? "bg-emerald-500" : pct >= 60 ? "bg-sky-500" : pct >= 30 ? "bg-amber-500" : "bg-slate-400";
+}
+
+<div class="space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="text-xl font-semibold text-slate-900">Projects</h1>
+            <p class="text-sm text-slate-500">Machine builds in progress, their status and completion.</p>
+        </div>
+        <button type="button" onclick="openNewProject()"
+                class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+            + New Project
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.PhotoMessage))
+    {
+        <div class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">@Model.PhotoMessage</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.PhotoError))
+    {
+        <div class="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">@Model.PhotoError</div>
+    }
+
+    <form method="get" class="flex gap-2">
+        <input type="text" name="Search" value="@Model.Search" placeholder="Search by project, machine type or customer..."
+               class="w-full max-w-sm rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500" />
+        <button type="submit" class="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">Search</button>
+        @if (!string.IsNullOrWhiteSpace(Model.Search))
+        {
+            <a href="/Projects" class="rounded-md px-3 py-2 text-sm text-slate-500 hover:underline">Clear</a>
+        }
+    </form>
+
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <!-- Left: project list -->
+        <div class="lg:col-span-2 rounded-lg border border-slate-200 bg-white overflow-hidden">
+            <div class="max-h-[32rem] overflow-y-auto divide-y divide-slate-100">
+                @foreach (var p in Model.Projects)
+                {
+                    var isSelected = Model.Selected?.Id == p.Id;
+                    <a href="@Url.Page("Index", new { selectedId = p.Id, search = Model.Search })"
+                       class="block px-4 py-3 text-sm @(isSelected ? "bg-sky-50" : "hover:bg-slate-50")">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex min-w-0 items-center gap-2">
+                                @if (p.HasPhoto)
+                                {
+                                    <img src="@Url.Page("Index", "Photo", new { id = p.Id })" alt="" class="h-8 w-8 shrink-0 rounded object-cover ring-1 ring-slate-200" />
+                                }
+                                else
+                                {
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-400 ring-1 ring-slate-200">&#128247;</span>
+                                }
+                                <div class="min-w-0">
+                                    <div class="truncate font-medium text-slate-900">@p.Name</div>
+                                    <div class="truncate text-xs text-slate-500">@p.MachineType &middot; @p.CustomerName</div>
+                                </div>
+                            </div>
+                            <partial name="_ProjectStatusBadge" model="p.Status" />
+                        </div>
+                        <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div class="@BarColor(p.CompletionPercent) h-full rounded-full" style="width:@p.CompletionPercent%"></div>
+                        </div>
+                        <div class="mt-1 text-[11px] text-slate-400">@p.CompletionPercent% complete &middot; @DaysLabel(p.TargetDate, p.Status)</div>
+                    </a>
+                }
+                @if (!Model.Projects.Any())
+                {
+                    <div class="px-4 py-6 text-center text-sm text-slate-400">No projects match your search.</div>
+                }
+            </div>
+        </div>
+
+        <!-- Right: detail pane -->
+        <div class="lg:col-span-3 space-y-4">
+            @if (Model.Selected is { } project)
+            {
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="group relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                                @if (project.HasPhoto)
+                                {
+                                    <img src="@Url.Page("Index", "Photo", new { id = project.Id })" alt="@project.Name" class="h-full w-full object-cover" />
+                                }
+                                else
+                                {
+                                    <div class="flex h-full w-full items-center justify-center text-2xl text-slate-300">&#128247;</div>
+                                }
+                                <form method="post" asp-page-handler="UploadPhoto" asp-route-id="@project.Id" enctype="multipart/form-data" class="absolute inset-0">
+                                    <label class="flex h-full w-full cursor-pointer items-center justify-center bg-slate-900/0 text-[10px] font-medium text-transparent group-hover:bg-slate-900/50 group-hover:text-white">
+                                        @(project.HasPhoto ? "Change" : "Add Photo")
+                                        <input type="file" name="photo" accept="image/*" class="hidden" onchange="this.form.submit()" />
+                                    </label>
+                                </form>
+                            </div>
+                            <div>
+                                <div class="text-xs text-slate-500">@project.Id &middot; @project.MachineType</div>
+                                <h2 class="text-lg font-semibold text-slate-900">@project.Name</h2>
+                                <div class="text-sm text-slate-500">Customer: @project.CustomerName</div>
+                                @if (project.HasPhoto)
+                                {
+                                    <form method="post" asp-page-handler="RemovePhoto" asp-route-id="@project.Id" class="mt-1">
+                                        <button type="submit" class="text-[11px] text-red-600 hover:underline">Remove photo</button>
+                                    </form>
+                                }
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <partial name="_ProjectStatusBadge" model="project.Status" />
+                            <button type="button" onclick="openEditProject()" class="mt-2 block text-xs font-medium text-sky-700 hover:underline">Edit</button>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <div class="mb-1 flex items-center justify-between text-xs">
+                            <span class="font-medium text-slate-700">Completion</span>
+                            <span class="font-semibold text-slate-900">@project.CompletionPercent%</span>
+                        </div>
+                        <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div class="@BarColor(project.CompletionPercent) h-full rounded-full" style="width:@project.CompletionPercent%"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        <div class="rounded-md border border-slate-200 p-3">
+                            <div class="text-xs text-slate-500">Start Date</div>
+                            <div class="text-sm font-medium text-slate-900">@project.StartDate.ToString("dd MMM yyyy")</div>
+                        </div>
+                        <div class="rounded-md border border-slate-200 p-3">
+                            <div class="text-xs text-slate-500">Target Date</div>
+                            <div class="text-sm font-medium text-slate-900">@(project.TargetDate?.ToString("dd MMM yyyy") ?? "—")</div>
+                        </div>
+                        <div class="rounded-md border border-slate-200 p-3">
+                            <div class="text-xs text-slate-500">Timeline</div>
+                            <div class="text-sm font-medium text-slate-900">@DaysLabel(project.TargetDate, project.Status)</div>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(project.Notes))
+                    {
+                        <div class="mt-4 rounded-md bg-slate-50 p-3 text-sm text-slate-600">
+                            <div class="mb-1 text-xs font-semibold uppercase text-slate-400">Notes</div>
+                            @project.Notes
+                        </div>
+                    }
+                </div>
+
+                <script type="application/json" id="selectedProjectJson">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    id = project.Id,
+                    name = project.Name,
+                    machineType = project.MachineType,
+                    customerName = project.CustomerName,
+                    startDate = project.StartDate.ToString("yyyy-MM-dd"),
+                    targetDate = project.TargetDate?.ToString("yyyy-MM-dd") ?? "",
+                    status = (int)project.Status,
+                    completionPercent = project.CompletionPercent,
+                    notes = project.Notes ?? string.Empty,
+                }))</script>
+            }
+            else
+            {
+                <div class="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-400">
+                    Select a project to view its details.
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- New/Edit Project modal -->
+<div id="newProjectModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+    <div class="w-full max-w-xl rounded-lg bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+        <form method="post" asp-page-handler="Save">
+            <input type="hidden" asp-for="Form.Id" />
+            <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+                <h3 id="projectModalTitle" class="text-sm font-semibold text-slate-900">New Project</h3>
+                <button type="button" onclick="document.getElementById('newProjectModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">&#10005;</button>
+            </div>
+            <div class="space-y-3 px-5 py-4">
+                <label class="block text-xs font-medium text-slate-600">Project Name
+                    <input asp-for="Form.Name" placeholder="e.g. CNC Vertical Machining Center — VMC 850" class="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm" />
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="block text-xs font-medium text-slate-600">Machine Type
+                        <input asp-for="Form.MachineType" class="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm" />
+                    </label>
+                    <label class="block text-xs font-medium text-slate-600">Customer
+                        <input asp-for="Form.CustomerName" class="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm" />
+                    </label>
+                    <label class="block text-xs font-medium text-slate-600">Start Date
+                        <input asp-for="Form.StartDate" type="date" class="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm" />
+                    </label>
+                    <label class="block text-xs font-medium text-slate-600">Target Date
+                        <input asp-for="Form.TargetDate" type="date" class="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm" />
+                    </label>
+                    <label class="block text-xs font-medium text-slate-600">Status
+                        <select asp-for="Form.Status" asp-items="Html.GetEnumSelectList<ProjectStatus>()" class="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"></select>
+                    </label>
+                    <label class="block text-xs font-medium text-slate-600">Completion %
+                        <div class="mt-1 flex items-center gap-2">
+                            <input asp-for="Form.CompletionPercent" type="range" min="0" max="100" step="5"
+                                   oninput="document.getElementById('completionPctLabel').textContent = this.value + '%'"
+                                   class="w-full" />
+                            <span id="completionPctLabel" class="w-12 shrink-0 text-right text-sm font-medium text-slate-900">0%</span>
+                        </div>
+                    </label>
+                </div>
+                <label class="block text-xs font-medium text-slate-600">Notes
+                    <textarea asp-for="Form.Notes" rows="3" placeholder="Build stage, pending parts, customer sign-off..." class="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"></textarea>
+                </label>
+            </div>
+            <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+                <button type="button" onclick="document.getElementById('newProjectModal').classList.add('hidden')" class="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">Save Project</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        const modal = document.getElementById('newProjectModal');
+        const title = document.getElementById('projectModalTitle');
+        const fields = {
+            id: document.getElementById('Form_Id'),
+            name: document.getElementById('Form_Name'),
+            machineType: document.getElementById('Form_MachineType'),
+            customerName: document.getElementById('Form_CustomerName'),
+            startDate: document.getElementById('Form_StartDate'),
+            targetDate: document.getElementById('Form_TargetDate'),
+            status: document.getElementById('Form_Status'),
+            completionPercent: document.getElementById('Form_CompletionPercent'),
+            notes: document.getElementById('Form_Notes'),
+        };
+        const pctLabel = document.getElementById('completionPctLabel');
+
+        function resetForm() {
+            fields.id.value = '';
+            fields.name.value = '';
+            fields.machineType.value = '';
+            fields.customerName.value = '';
+            fields.startDate.value = new Date().toISOString().slice(0, 10);
+            fields.targetDate.value = '';
+            fields.status.value = 0;
+            fields.completionPercent.value = 0;
+            fields.notes.value = '';
+            pctLabel.textContent = '0%';
+        }
+
+        window.openNewProject = function () {
+            title.textContent = 'New Project';
+            resetForm();
+            modal.classList.remove('hidden');
+        };
+
+        window.openEditProject = function () {
+            const el = document.getElementById('selectedProjectJson');
+            if (!el) return;
+            const data = JSON.parse(el.textContent);
+
+            title.textContent = 'Edit ' + data.name;
+            fields.id.value = data.id;
+            fields.name.value = data.name;
+            fields.machineType.value = data.machineType;
+            fields.customerName.value = data.customerName;
+            fields.startDate.value = data.startDate;
+            fields.targetDate.value = data.targetDate;
+            fields.status.value = data.status;
+            fields.completionPercent.value = data.completionPercent;
+            pctLabel.textContent = data.completionPercent + '%';
+            fields.notes.value = data.notes;
+
+            modal.classList.remove('hidden');
+        };
+    })();
+</script>
+}
