@@ -10,6 +10,7 @@ public record PartListItemDto(
     string Name,
     string Material,
     string Category,
+    string VendorName,
     int Stock,
     StockStatus Status,
     bool HasPhoto);

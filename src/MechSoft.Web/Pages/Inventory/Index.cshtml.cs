@@ -12,38 +12,41 @@ public class IndexModel : PageModel
 
     public IndexModel(IPartService partService) => _partService = partService;
 
-    [BindProperty(SupportsGet = true)]
-    public string? Search { get; set; }
-
-    /// <summary>Optional status filter; null shows everything.</summary>
-    [BindProperty(SupportsGet = true)]
-    public StockStatus? Status { get; set; }
-
-    public IReadOnlyList<PartListItemDto> AllParts { get; private set; } = Array.Empty<PartListItemDto>();
+    /// <summary>Every part. Filtering, searching, sorting and paging all happen client-side.</summary>
     public IReadOnlyList<PartListItemDto> Parts { get; private set; } = Array.Empty<PartListItemDto>();
-
-    public int TotalUnits => AllParts.Sum(p => p.Stock);
-    public int Count(StockStatus s) => AllParts.Count(p => p.Status == s);
-
-    [TempData]
-    public string? Message { get; set; }
 
     public async Task OnGetAsync(CancellationToken ct)
     {
-        AllParts = await _partService.GetAllAsync(Search, ct);
-        Parts = Status is { } s ? AllParts.Where(p => p.Status == s).ToList() : AllParts;
+        Parts = await _partService.GetAllAsync(null, ct);
     }
 
-    public async Task<IActionResult> OnPostUpdateStockAsync(string id, int stock, StockStatus status, string? search, StockStatus? filter, CancellationToken ct)
+    /// <summary>
+    /// AJAX stock/status update used by the inventory table's inline "Save". Returns JSON rather
+    /// than redirecting, so the page can update the row in place without a full reload.
+    /// </summary>
+    public async Task<IActionResult> OnPostUpdateStockAsync([FromForm] string id, [FromForm] int stock, [FromForm] StockStatus status, CancellationToken ct)
     {
         if (stock < 0)
         {
-            Message = "Stock cannot be negative.";
+            return new JsonResult(new { success = false, error = "Enter a whole number of 0 or more." });
         }
-        else if (await _partService.UpdateStockAsync(id, stock, status, ct))
+
+        // Stock 0 only ever means Out of Stock, and Out of Stock only ever means 0 on hand.
+        if ((stock == 0) != (status == StockStatus.OutOfStock))
         {
-            Message = $"Updated stock for {id}.";
+            return new JsonResult(new
+            {
+                success = false,
+                error = stock == 0 ? "Stock 0 can only be saved as Out of stock." : "Out of stock needs a stock of 0.",
+            });
         }
-        return RedirectToPage(new { search, status = filter });
+
+        var ok = await _partService.UpdateStockAsync(id, stock, status, ct);
+        if (!ok)
+        {
+            return new JsonResult(new { success = false, error = "That part no longer exists." });
+        }
+
+        return new JsonResult(new { success = true, id, stock, status = (int)status });
     }
 }

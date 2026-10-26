@@ -28,7 +28,7 @@ public class PartService : IPartService
 
         return await query
             .OrderBy(p => p.Id)
-            .Select(p => new PartListItemDto(p.Id, p.Sku, p.Name, p.Material, p.Category, p.Stock, p.Status, p.Photo != null))
+            .Select(p => new PartListItemDto(p.Id, p.Sku, p.Name, p.Material, p.Category, p.VendorName, p.Stock, p.Status, p.Photo != null))
             .ToListAsync(ct);
     }
 

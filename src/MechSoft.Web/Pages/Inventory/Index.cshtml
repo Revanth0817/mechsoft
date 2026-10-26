@@ -1,105 +1,185 @@
 @page "/Inventory"
 @model MechSoft.Web.Pages.Inventory.IndexModel
-@using MechSoft.Domain.Enums
 @{
     ViewData["Title"] = "Inventory";
+    var partsJson = System.Text.Json.JsonSerializer.Serialize(Model.Parts.Select(p => new
+    {
+        id = p.Id,
+        sku = p.Sku,
+        name = p.Name,
+        mat = p.Material,
+        cat = p.Category,
+        vendor = string.IsNullOrWhiteSpace(p.VendorName) ? "—" : p.VendorName,
+        stock = p.Stock,
+        st = (int)p.Status,
+    }));
 }
 
-<div class="space-y-4">
-    <div>
-        <h1 class="text-xl font-semibold text-slate-900">Inventory</h1>
-        <p class="text-sm text-slate-500">Stock levels for every part. Specifications and vendor contacts are on the Product Details page.</p>
-    </div>
+<link rel="stylesheet" href="~/css/inventory.css" asp-append-version="true" />
 
-    @if (!string.IsNullOrEmpty(Model.Message))
-    {
-        <div class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">@Model.Message</div>
-    }
+<div class="inv-proto">
+<h1>Inventory</h1>
+<p class="sub">Stock levels for every part. <span id="cat"></span></p>
 
-    <!-- Summary -->
-    <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <a href="/Inventory" class="rounded-lg border border-slate-200 bg-white p-4 hover:border-sky-300">
-            <div class="text-xs text-slate-500">Total parts</div>
-            <div class="text-2xl font-semibold text-slate-900">@Model.AllParts.Count</div>
-        </a>
-        <div class="rounded-lg border border-slate-200 bg-white p-4">
-            <div class="text-xs text-slate-500">Units on hand</div>
-            <div class="text-2xl font-semibold text-slate-900">@Model.TotalUnits.ToString("N0")</div>
-        </div>
-        <a href="@Url.Page("Index", new { search = Model.Search, status = StockStatus.InStock })" class="rounded-lg border border-slate-200 bg-white p-4 hover:border-emerald-300">
-            <div class="text-xs text-slate-500">In stock</div>
-            <div class="text-2xl font-semibold text-emerald-700">@Model.Count(StockStatus.InStock)</div>
-        </a>
-        <a href="@Url.Page("Index", new { search = Model.Search, status = StockStatus.LowStock })" class="rounded-lg border border-slate-200 bg-white p-4 hover:border-amber-300">
-            <div class="text-xs text-slate-500">Low stock</div>
-            <div class="text-2xl font-semibold text-amber-700">@Model.Count(StockStatus.LowStock)</div>
-        </a>
-        <a href="@Url.Page("Index", new { search = Model.Search, status = StockStatus.OutOfStock })" class="rounded-lg border border-slate-200 bg-white p-4 hover:border-red-300">
-            <div class="text-xs text-slate-500">Out of stock</div>
-            <div class="text-2xl font-semibold text-red-700">@Model.Count(StockStatus.OutOfStock)</div>
-        </a>
-    </div>
+<div class="tabs" id="tabs" role="group" aria-label="Filter by stock status"></div>
+<div class="scope" id="scope" aria-live="polite"></div>
 
-    <form method="get" class="flex flex-wrap gap-2">
-        <input type="text" name="Search" value="@Model.Search" placeholder="Search by SKU, name, material or vendor..."
-               class="w-full max-w-sm rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500" />
-        <select name="Status" class="rounded-md border border-slate-200 px-3 py-2 text-sm">
-            <option value="" selected="@(Model.Status is null)">All statuses</option>
-            <option value="@StockStatus.InStock" selected="@(Model.Status == StockStatus.InStock)">In Stock</option>
-            <option value="@StockStatus.LowStock" selected="@(Model.Status == StockStatus.LowStock)">Low Stock</option>
-            <option value="@StockStatus.OutOfStock" selected="@(Model.Status == StockStatus.OutOfStock)">Out of Stock</option>
-        </select>
-        <button type="submit" class="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">Filter</button>
-        @if (!string.IsNullOrWhiteSpace(Model.Search) || Model.Status is not null)
-        {
-            <a href="/Inventory" class="rounded-md px-3 py-2 text-sm text-slate-500 hover:underline">Clear</a>
-        }
-    </form>
-
-    <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-200 text-sm">
-                <thead class="bg-slate-50 text-xs uppercase text-slate-500">
-                    <tr>
-                        <th class="px-3 py-2 text-left">SKU</th>
-                        <th class="px-3 py-2 text-left">Name</th>
-                        <th class="px-3 py-2 text-left">Category</th>
-                        <th class="px-3 py-2 text-left">Status</th>
-                        <th class="px-3 py-2 text-left">Update stock</th>
-                        <th class="px-3 py-2 text-right"></th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    @foreach (var p in Model.Parts)
-                    {
-                        <tr class="hover:bg-slate-50">
-                            <td class="px-3 py-2 font-medium text-slate-900">@p.Sku</td>
-                            <td class="px-3 py-2 text-slate-700">@p.Name</td>
-                            <td class="px-3 py-2 text-slate-500">@p.Category</td>
-                            <td class="px-3 py-2"><partial name="_StockBadge" model="p.Status" /></td>
-                            <td class="px-3 py-2">
-                                <form method="post" asp-page-handler="UpdateStock" class="flex flex-wrap items-center gap-2">
-                                    <input type="hidden" name="id" value="@p.Id" />
-                                    <input type="hidden" name="search" value="@Model.Search" />
-                                    <input type="hidden" name="filter" value="@Model.Status" />
-                                    <input type="number" name="stock" min="0" value="@p.Stock" aria-label="Stock for @p.Sku" class="w-24 rounded-md border border-slate-200 px-2 py-1 text-right text-sm" />
-                                    <select name="status" aria-label="Status for @p.Sku" class="rounded-md border border-slate-200 px-2 py-1 text-sm">
-                                        <option value="@StockStatus.InStock" selected="@(p.Status == StockStatus.InStock)">In Stock</option>
-                                        <option value="@StockStatus.LowStock" selected="@(p.Status == StockStatus.LowStock)">Low Stock</option>
-                                        <option value="@StockStatus.OutOfStock" selected="@(p.Status == StockStatus.OutOfStock)">Out of Stock</option>
-                                    </select>
-                                    <button type="submit" class="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800">Save</button>
-                                </form>
-                            </td>
-                            <td class="px-3 py-2 text-right"><a href="@Url.Page("/Products/Index", new { selectedId = p.Id })" class="text-xs text-sky-700 hover:underline">Details &amp; vendor &rarr;</a></td>
-                        </tr>
-                    }
-                    @if (!Model.Parts.Any())
-                    {
-                        <tr><td colspan="6" class="px-3 py-8 text-center text-slate-400">No parts match your filters.</td></tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </div>
+<div class="bar">
+<input type="search" id="q" placeholder="Search by SKU, name, material or vendor" aria-label="Search by SKU, name, material or vendor">
+<select id="catSel" aria-label="Category"></select>
+<select id="stSel" aria-label="Status">
+<option value="">All statuses</option><option value="0">In stock</option><option value="1">Low stock</option><option value="2">Out of stock</option>
+</select>
+<select id="sortSel" aria-label="Sort by">
+<option value="">Sort: default</option><option value="sku">SKU A&ndash;Z</option><option value="name">Name A&ndash;Z</option><option value="stockA">Stock: low to high</option><option value="stockD">Stock: high to low</option>
+</select>
+<button class="btn" id="clear" type="button">Clear all</button>
 </div>
+
+<div id="msg"><div id="msgIn" role="status"></div></div>
+<div class="wrap"><table>
+<thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Material</th><th>Vendor</th><th>Status</th><th>Update stock &amp; status</th><th><span class="sr" style="position:absolute;left:-9999px">Details</span></th></tr></thead>
+<tbody id="rows"></tbody></table><div id="empty" class="empty" hidden>No parts match your filters.</div></div>
+
+<div class="foot">
+<div id="count" aria-live="polite"></div>
+<nav class="pager" id="pager" aria-label="Pagination"></nav>
+<label>Rows per page <select id="ps"><option>10</option><option>25</option><option>50</option></select></label>
+</div>
+
+<dialog id="dlg" aria-labelledby="dT"><h2 id="dT"></h2><dl id="dB"></dl><a href="#" id="dLink" class="lnk dlgLink">View full details &amp; vendor contact &rarr;</a><br><button class="btn pri" id="dX" type="button" style="margin-top:12px">Close</button></dialog>
+</div>
+
+<form id="invAf" hidden>@Html.AntiForgeryToken()</form>
+
+<script type="application/json" id="invPartsData">@Html.Raw(partsJson)</script>
+
+@section Scripts {
+<script>
+(function(){
+var SAVE_URL = "@Url.Page("Index", "UpdateStock")";
+var PRODUCT_URL = "@Url.Page("/Products/Index")";
+function afToken(){var el=document.querySelector('#invAf input[name="__RequestVerificationToken"]');return el?el.value:""}
+
+var parts = JSON.parse(document.getElementById("invPartsData").textContent);
+var ST=["In stock","Low stock","Out of stock"];
+var S={q:"",cat:"",st:"",sort:"",page:1,ps:10};
+var $=function(i){return document.getElementById(i)};
+function esc(t){return String(t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+/* Search covers SKU, name, material, vendor. Category is NOT searched (own dropdown). */
+function inScope(p){var q=S.q.trim().toLowerCase();return(!q||(p.sku+" "+p.name+" "+p.mat+" "+p.vendor).toLowerCase().indexOf(q)>-1)&&(!S.cat||p.cat===S.cat)}
+function sum(a){return a.reduce(function(t,p){return t+p.stock},0)}
+function sorted(a){var s=a.slice();
+ if(S.sort==="sku")s.sort(function(x,y){return x.sku.localeCompare(y.sku)});
+ else if(S.sort==="name")s.sort(function(x,y){return x.name.localeCompare(y.name)});
+ else if(S.sort==="stockA")s.sort(function(x,y){return x.stock-y.stock});
+ else if(S.sort==="stockD")s.sort(function(x,y){return y.stock-x.stock});
+ return s}
+function pageList(n,cur){var out=[],last=0;for(var i=1;i<=n;i++){if(i===1||i===n||Math.abs(i-cur)<=1){if(last&&i-last>1)out.push(0);out.push(i);last=i}}return out}
+var msgTimer;
+function toast(text,kind){clearTimeout(msgTimer);$("msgIn").innerHTML=text?'<div class="msg"'+(kind==="err"?' style="background:var(--badbg);color:var(--bad)"':'')+'>'+text+'</div>':"";if(text&&kind!=="err")msgTimer=setTimeout(function(){$("msgIn").innerHTML=""},7000)}
+
+/* Keep keyboard focus across re-renders */
+function focusKey(){var a=document.activeElement;return a&&a.dataset&&a.dataset.f?a.dataset.f:null}
+function restoreFocus(k){if(!k)return;var el=document.querySelector('[data-f="'+k+'"]');if(el&&!el.disabled)el.focus()}
+
+/* Stock <-> status rules: stock 0 only as Out of stock; Out of stock only with 0 */
+function applyRules(tr){
+ var p=byId(tr.dataset.id),inp=tr.querySelector("input"),sel=tr.querySelector("select"),v=inp.value.trim(),ok=/^\d+$/.test(v),zero=ok&&+v===0,pos=ok&&+v>0;
+ var o=sel.options;o[0].disabled=zero;o[1].disabled=zero;o[2].disabled=pos;
+ if(zero&&sel.value!=="2")sel.value="2";
+ if(pos&&sel.value==="2")sel.value=String(p.st!==2?p.st:0);
+ var dirty=v!==String(p.stock)||+sel.value!==p.st;
+ tr.querySelector(".sv").disabled=!dirty;
+}
+function byId(id){return parts.find(function(x){return x.id===id})}
+function rowErr(tr,text){var e=tr.querySelector(".rerr"),inp=tr.querySelector("input");e.textContent=text||"";if(text)inp.setAttribute("aria-invalid","true");else inp.removeAttribute("aria-invalid")}
+
+function render(msg,opt){
+ opt=opt||{};var fk=opt.focus||focusKey();
+ var all=parts.length, units=sum(parts);
+ $("cat").innerHTML="<b>"+all+" parts</b> and <b>"+units.toLocaleString("en-IN")+" units</b> in the catalogue.";
+ var sc=parts.filter(inScope), by=function(s){return sc.filter(function(p){return p.st===s}).length};
+ var fl=sorted(sc.filter(function(p){return S.st===""||p.st===+S.st}));
+ var defs=[["","All",sc.length,""],["0","In stock",by(0),"in"],["1","Low stock",by(1),"low"],["2","Out of stock",by(2),"out"]];
+ var h="";defs.forEach(function(d){h+='<button type="button" data-f="card-'+d[0]+'" class="tab '+d[3]+'" data-st="'+d[0]+'" aria-pressed="'+(S.st===d[0])+'"><span class="l">'+d[1]+'</span><span class="n">'+d[2]+'</span></button>'});
+ h+='<div class="tab static"><span class="l">Units on hand</span><span class="n">'+sum(fl).toLocaleString("en-IN")+'</span><span class="h">in the current view (follows status)</span></div>';
+ $("tabs").innerHTML=h;
+ var bits=[];if(S.q.trim())bits.push("matching “"+esc(S.q.trim())+"”");if(S.cat)bits.push("in "+esc(S.cat));
+ $("scope").innerHTML=bits.length?"Showing parts "+bits.join(" ")+" ("+sc.length+" of "+all+" in the catalogue) <button type='button' class='lnk' id='sc' data-f='sc'>Clear</button>":"";
+ $("clear").disabled=!(S.q.trim()||S.cat||S.st);
+ var pages=Math.max(1,Math.ceil(fl.length/S.ps));if(S.page>pages)S.page=pages;if(S.page<1||isNaN(S.page))S.page=1;
+ var from=(S.page-1)*S.ps, slice=fl.slice(from,from+S.ps);
+ $("rows").innerHTML=slice.map(function(p){return '<tr data-id="'+p.id+'"'+(opt.flash===p.id?' class="flash"':'')+'>'+
+  '<td data-l="SKU"><b>'+esc(p.sku)+'</b></td><td data-l="Name">'+esc(p.name)+'</td><td data-l="Category">'+esc(p.cat)+'</td>'+
+  '<td data-l="Material" class="mute">'+esc(p.mat)+'</td><td data-l="Vendor" class="mute">'+esc(p.vendor)+'</td>'+
+  '<td data-l="Status"><span class="badge b'+p.st+'">'+ST[p.st]+'</span></td>'+
+  '<td data-l="Update" class="upd"><div class="edit"><input type="number" inputmode="numeric" min="0" step="1" value="'+p.stock+'" data-f="in-'+p.id+'" aria-label="Stock for '+esc(p.sku)+'"> '+
+  '<select data-f="sel-'+p.id+'" aria-label="Status for '+esc(p.sku)+'">'+ST.map(function(s,i){return '<option value="'+i+'"'+(i===p.st?" selected":"")+'>'+s+'</option>'}).join("")+'</select> '+
+  '<button class="btn pri sv" type="button" data-f="sv-'+p.id+'" disabled>Save</button><div class="rerr" role="alert"></div></div></td>'+
+  '<td data-l=""><button type="button" class="lnk dt" data-f="dt-'+p.id+'" aria-label="Details and vendor for '+esc(p.sku)+'">Details</button></td></tr>'}).join("");
+ Array.prototype.forEach.call($("rows").querySelectorAll("tr"),applyRules);
+ $("empty").hidden=fl.length>0;
+ $("count").textContent=fl.length?"Showing "+(from+1)+"–"+(from+slice.length)+" of "+fl.length+" items":"Showing 0 of 0 items";
+ var pg="";if(pages>1){pg+='<button class="btn" data-f="pp" data-p="'+(S.page-1)+'"'+(S.page==1?" disabled":"")+'>Previous</button>';
+  pageList(pages,S.page).forEach(function(n){pg+=n?'<button class="btn" data-f="p-'+n+'" data-p="'+n+'" aria-label="Page '+n+'"'+(n===S.page?' aria-current="page"':"")+'>'+n+'</button>':'<span class="gap" aria-hidden="true">…</span>'});
+  pg+='<button class="btn" data-f="pn" data-p="'+(S.page+1)+'"'+(S.page==pages?" disabled":"")+'>Next</button>'}
+ $("pager").innerHTML=pg;
+ $("stSel").value=S.st;$("catSel").value=S.cat;$("sortSel").value=S.sort;
+ if(msg!==undefined)toast(msg);
+ restoreFocus(fk);
+}
+var cats=Array.from(new Set(parts.map(function(p){return p.cat}))).sort();
+$("catSel").innerHTML='<option value="">All categories</option>'+cats.map(function(c){return '<option>'+esc(c)+'</option>'}).join("");
+function reset(){S.page=1}
+$("q").addEventListener("input",function(e){S.q=e.target.value;reset();render("")});
+$("catSel").addEventListener("change",function(e){S.cat=e.target.value;reset();render("")});
+$("stSel").addEventListener("change",function(e){S.st=e.target.value;reset();render("")});
+$("sortSel").addEventListener("change",function(e){S.sort=e.target.value;reset();render("")});
+$("ps").addEventListener("change",function(e){S.ps=+e.target.value;reset();render("")});
+function clr(){S.q="";S.cat="";S.st="";S.page=1;$("q").value="";render("")}
+$("clear").addEventListener("click",clr);
+$("tabs").addEventListener("click",function(e){var b=e.target.closest(".tab[data-st]");if(!b)return;S.st=b.dataset.st;reset();render("")});
+$("scope").addEventListener("click",function(e){if(e.target.id==="sc"){S.q="";S.cat="";$("q").value="";reset();render("",{focus:"card-"+S.st})}});
+$("pager").addEventListener("click",function(e){var b=e.target.closest("[data-p]");if(!b||b.disabled)return;var n=parseInt(b.dataset.p,10);S.page=isNaN(n)||n<1?1:n;render("",{focus:"p-"+S.page})});
+
+/* Row editing: live rules + dirty state */
+function onEdit(e){var tr=e.target.closest("tr");if(!tr)return;
+ if(e.target.tagName==="SELECT"&&e.target.value==="2")tr.querySelector("input").value="0";
+ rowErr(tr,"");applyRules(tr)}
+$("rows").addEventListener("input",onEdit);
+$("rows").addEventListener("change",onEdit);
+
+async function save(tr){
+ var p=byId(tr.dataset.id),inp=tr.querySelector("input"),sel=tr.querySelector("select"),v=inp.value.trim(),ns=+sel.value;
+ if(v===""||!/^\d+$/.test(v)){rowErr(tr,"Enter a whole number of 0 or more. Nothing was saved.");inp.focus();return}
+ var n=+v;
+ if((n===0)!==(ns===2)){rowErr(tr,n===0?"Stock 0 can only be saved as Out of stock.":"Out of stock needs a stock of 0.");inp.focus();return}
+ var btn=tr.querySelector(".sv");btn.disabled=true;
+ try{
+  var body=new URLSearchParams({id:p.id,stock:String(n),status:String(ns),__RequestVerificationToken:afToken()});
+  var res=await fetch(SAVE_URL,{method:"POST",body:body,headers:{"X-Requested-With":"XMLHttpRequest"}});
+  var data=await res.json().catch(function(){return{success:false,error:"Unexpected response from the server."}});
+  if(!res.ok||!data.success){rowErr(tr,data.error||"Could not save. Please try again.");btn.disabled=false;inp.focus();return}
+  p.stock=n;p.st=ns;
+  var leaves=S.st!==""&&+S.st!==p.st;
+  var text="Saved <b>"+esc(p.sku)+"</b>: "+n.toLocaleString("en-IN")+" units, "+ST[ns]+".";
+  if(leaves)text+=" It is no longer shown here because the view is filtered to “"+ST[+S.st]+"”.";
+  render(text,{flash:leaves?null:p.id,focus:leaves?"card-"+S.st:"in-"+p.id});
+ }catch(err){
+  rowErr(tr,"Network error. Nothing was saved.");btn.disabled=false;
+ }
+}
+$("rows").addEventListener("click",function(e){
+ var b=e.target.closest(".sv");if(b){save(b.closest("tr"));return}
+ var d=e.target.closest(".dt");if(d){var p=byId(d.closest("tr").dataset.id);
+  $("dT").textContent=p.name;
+  $("dB").innerHTML=[["SKU",p.sku],["Category",p.cat],["Material",p.mat],["Vendor",p.vendor],["Stock",p.stock+" units"],["Status",ST[p.st]]].map(function(r){return "<dt>"+r[0]+"</dt><dd>"+esc(r[1])+"</dd>"}).join("");
+  $("dLink").href=PRODUCT_URL+"?selectedId="+encodeURIComponent(p.id);
+  $("dlg").showModal()}});
+$("rows").addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.matches("input[type=number]")){e.preventDefault();var tr=e.target.closest("tr");if(!tr.querySelector(".sv").disabled)save(tr)}});
+$("dX").addEventListener("click",function(){$("dlg").close()});
+render();
+})();
+</script>
+}
