@@ -12,6 +12,7 @@
         vendor = string.IsNullOrWhiteSpace(p.VendorName) ? "—" : p.VendorName,
         stock = p.Stock,
         st = (int)p.Status,
+        version = p.Version,
     }));
 }
 
@@ -63,10 +64,41 @@ function afToken(){var el=document.querySelector('#invAf input[name="__RequestVe
 
 var parts = JSON.parse(document.getElementById("invPartsData").textContent);
 var ST=["In stock","Low stock","Out of stock"];
-var S={q:"",cat:"",st:"",sort:"",page:1,ps:10};
 var $=function(i){return document.getElementById(i)};
 function esc(t){return String(t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
-/* Search covers SKU, name, material, vendor. Category is NOT searched (own dropdown). */
+
+var cats=Array.from(new Set(parts.map(function(p){return p.cat}))).sort();
+$("catSel").innerHTML='<option value="">All categories</option>'+cats.map(function(c){return '<option>'+esc(c)+'</option>'}).join("");
+
+/* ---------------- REQ-01: view state lives in the URL query string ---------------- */
+var SORTS=["sku","name","stockA","stockD"], STS=["0","1","2"], PSS=[10,25,50];
+function readState(){
+ var sp=new URLSearchParams(location.search);
+ var q=sp.get("q"); if(q===null)q=sp.get("search"); // legacy alias
+ q=(q||"").slice(0,200);
+ var cat=sp.get("cat")||""; if(cat&&cats.indexOf(cat)===-1)cat="";
+ var st=sp.get("st")||""; if(STS.indexOf(st)===-1)st="";
+ var sort=sp.get("sort")||""; if(SORTS.indexOf(sort)===-1)sort="";
+ var ps=parseInt(sp.get("ps"),10); if(PSS.indexOf(ps)===-1)ps=10;
+ var p=parseInt(sp.get("p"),10); if(isNaN(p)||p<1)p=1;
+ return {q:q,cat:cat,st:st,sort:sort,ps:ps,page:p};
+}
+function writeState(){
+ var sp=new URLSearchParams();
+ var q=S.q.trim().slice(0,200);
+ if(q)sp.set("q",q);
+ if(S.cat)sp.set("cat",S.cat);
+ if(S.st)sp.set("st",S.st);
+ if(S.sort)sp.set("sort",S.sort);
+ if(S.ps!==10)sp.set("ps",String(S.ps));
+ if(S.page!==1)sp.set("p",String(S.page));
+ var qs=sp.toString();
+ history.replaceState(null,"",location.pathname+(qs?"?"+qs:""));
+}
+var S=readState();
+$("q").value=S.q;
+$("ps").value=String(S.ps);
+
 function inScope(p){var q=S.q.trim().toLowerCase();return(!q||(p.sku+" "+p.name+" "+p.mat+" "+p.vendor).toLowerCase().indexOf(q)>-1)&&(!S.cat||p.cat===S.cat)}
 function sum(a){return a.reduce(function(t,p){return t+p.stock},0)}
 function sorted(a){var s=a.slice();
@@ -93,7 +125,21 @@ function applyRules(tr){
  tr.querySelector(".sv").disabled=!dirty;
 }
 function byId(id){return parts.find(function(x){return x.id===id})}
-function rowErr(tr,text){var e=tr.querySelector(".rerr"),inp=tr.querySelector("input");e.textContent=text||"";if(text)inp.setAttribute("aria-invalid","true");else inp.removeAttribute("aria-invalid")}
+function rowErr(tr,text,conflict){
+ var e=tr.querySelector(".rerr"),inp=tr.querySelector("input");
+ if(!text){e.innerHTML="";inp.removeAttribute("aria-invalid");return}
+ inp.setAttribute("aria-invalid","true");
+ if(conflict){
+  e.innerHTML=esc(text)+' <button type="button" class="btn uselatest">Use latest values</button>';
+  e.querySelector(".uselatest").addEventListener("click",function(){
+   var p=byId(tr.dataset.id);
+   p.stock=conflict.stock;p.st=conflict.status;p.version=conflict.version;
+   render(undefined,{focus:"in-"+p.id});
+  });
+ }else{
+  e.textContent=text;
+ }
+}
 
 function render(msg,opt){
  opt=opt||{};var fk=opt.focus||focusKey();
@@ -110,7 +156,7 @@ function render(msg,opt){
  $("clear").disabled=!(S.q.trim()||S.cat||S.st);
  var pages=Math.max(1,Math.ceil(fl.length/S.ps));if(S.page>pages)S.page=pages;if(S.page<1||isNaN(S.page))S.page=1;
  var from=(S.page-1)*S.ps, slice=fl.slice(from,from+S.ps);
- $("rows").innerHTML=slice.map(function(p){return '<tr data-id="'+p.id+'"'+(opt.flash===p.id?' class="flash"':'')+'>'+
+ $("rows").innerHTML=slice.map(function(p){return '<tr data-id="'+p.id+'" data-version="'+p.version+'"'+(opt.flash===p.id?' class="flash"':'')+'>'+
   '<td data-l="SKU"><b>'+esc(p.sku)+'</b></td><td data-l="Name">'+esc(p.name)+'</td><td data-l="Category">'+esc(p.cat)+'</td>'+
   '<td data-l="Material" class="mute">'+esc(p.mat)+'</td><td data-l="Vendor" class="mute">'+esc(p.vendor)+'</td>'+
   '<td data-l="Status"><span class="badge b'+p.st+'">'+ST[p.st]+'</span></td>'+
@@ -127,10 +173,9 @@ function render(msg,opt){
  $("pager").innerHTML=pg;
  $("stSel").value=S.st;$("catSel").value=S.cat;$("sortSel").value=S.sort;
  if(msg!==undefined)toast(msg);
+ writeState();
  restoreFocus(fk);
 }
-var cats=Array.from(new Set(parts.map(function(p){return p.cat}))).sort();
-$("catSel").innerHTML='<option value="">All categories</option>'+cats.map(function(c){return '<option>'+esc(c)+'</option>'}).join("");
 function reset(){S.page=1}
 $("q").addEventListener("input",function(e){S.q=e.target.value;reset();render("")});
 $("catSel").addEventListener("change",function(e){S.cat=e.target.value;reset();render("")});
@@ -157,11 +202,16 @@ async function save(tr){
  if((n===0)!==(ns===2)){rowErr(tr,n===0?"Stock 0 can only be saved as Out of stock.":"Out of stock needs a stock of 0.");inp.focus();return}
  var btn=tr.querySelector(".sv");btn.disabled=true;
  try{
-  var body=new URLSearchParams({id:p.id,stock:String(n),status:String(ns),__RequestVerificationToken:afToken()});
+  var body=new URLSearchParams({id:p.id,version:String(p.version),stock:String(n),status:String(ns),__RequestVerificationToken:afToken()});
   var res=await fetch(SAVE_URL,{method:"POST",body:body,headers:{"X-Requested-With":"XMLHttpRequest"}});
   var data=await res.json().catch(function(){return{success:false,error:"Unexpected response from the server."}});
+  if(res.status===409&&data.conflict){
+   rowErr(tr,data.error,{stock:data.stock,status:data.status,version:data.version});
+   btn.disabled=false;
+   return;
+  }
   if(!res.ok||!data.success){rowErr(tr,data.error||"Could not save. Please try again.");btn.disabled=false;inp.focus();return}
-  p.stock=n;p.st=ns;
+  p.stock=n;p.st=ns;p.version=data.version;
   var leaves=S.st!==""&&+S.st!==p.st;
   var text="Saved <b>"+esc(p.sku)+"</b>: "+n.toLocaleString("en-IN")+" units, "+ST[ns]+".";
   if(leaves)text+=" It is no longer shown here because the view is filtered to “"+ST[+S.st]+"”.";

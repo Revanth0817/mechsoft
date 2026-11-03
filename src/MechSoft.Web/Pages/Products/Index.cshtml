@@ -130,7 +130,7 @@
                         </div>
                         <div class="text-right">
                             <button type="button" onclick="openEditPart()" class="text-xs font-medium text-sky-700 hover:underline">Edit</button>
-                            <div class="mt-1"><a href="/Inventory?search=@Uri.EscapeDataString(part.Sku)" class="text-xs text-slate-500 hover:underline">View stock in Inventory &rarr;</a></div>
+                            <div class="mt-1"><a href="/Inventory?q=@Uri.EscapeDataString(part.Sku)" class="text-xs text-slate-500 hover:underline">View stock in Inventory &rarr;</a></div>
                         </div>
                     </div>
 
@@ -196,12 +196,11 @@
                 <script type="application/json" id="selectedPartJson">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
                 {
                     id = part.Id,
+                    version = part.Version,
                     sku = part.Sku,
                     name = part.Name,
                     material = part.Material,
                     category = part.Category,
-                    stock = part.Stock,
-                    status = (int)part.Status,
                     notes = part.Notes ?? string.Empty,
                     vendorName = part.VendorName,
                     vendorContactPerson = part.VendorContactPerson,
@@ -223,8 +222,8 @@
 <!-- New Part modal -->
 <div id="newPartModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
     <div class="w-full max-w-2xl rounded-lg bg-white shadow-xl max-h-[90vh] overflow-y-auto">
-        <form method="post" asp-page-handler="Save">
-            <input type="hidden" asp-for="NewPart.Id" />
+        <form method="post" id="partForm">
+            @Html.AntiForgeryToken()
             <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
                 <h3 id="partModalTitle" class="text-sm font-semibold text-slate-900">New Part</h3>
                 <button type="button" onclick="document.getElementById('newPartModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">&#10005;</button>
@@ -244,8 +243,6 @@
                         <input asp-for="NewPart.Category" class="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm" />
                     </label>
                 </div>
-                <input asp-for="NewPart.Stock" type="hidden" />
-                <input asp-for="NewPart.Status" type="hidden" />
 
                 <div class="rounded-md border border-slate-200 p-3">
                     <div class="mb-2 text-xs font-semibold uppercase text-slate-500">Vendor Details</div>
@@ -288,17 +285,17 @@
 @section Scripts {
 <script>
     (function () {
+        const CREATE_URL = "@Url.Page("Index", "Create")";
+        const UPDATE_URL = "@Url.Page("Index", "Update")";
         const rowsHost = document.getElementById('specRows');
         const modal = document.getElementById('newPartModal');
         const title = document.getElementById('partModalTitle');
+        const form = document.getElementById('partForm');
         const fields = {
-            id: document.getElementById('NewPart_Id'),
             sku: document.getElementById('NewPart_Sku'),
             name: document.getElementById('NewPart_Name'),
             material: document.getElementById('NewPart_Material'),
             category: document.getElementById('NewPart_Category'),
-            stock: document.getElementById('NewPart_Stock'),
-            status: document.getElementById('NewPart_Status'),
             notes: document.getElementById('NewPart_Notes'),
             vendorName: document.getElementById('NewPart_VendorName'),
             vendorContactPerson: document.getElementById('NewPart_VendorContactPerson'),
@@ -319,13 +316,10 @@
         }
 
         function resetForm() {
-            fields.id.value = '';
             fields.sku.value = '';
             fields.name.value = '';
             fields.material.value = '';
             fields.category.value = '';
-            fields.stock.value = 0;
-            fields.status.value = 2; // new parts start out of stock; set stock on the Inventory page
             fields.notes.value = '';
             fields.vendorName.value = '';
             fields.vendorContactPerson.value = '';
@@ -337,6 +331,7 @@
 
         window.openNewPart = function () {
             title.textContent = 'New Part';
+            form.action = CREATE_URL;
             resetForm();
             modal.classList.remove('hidden');
         };
@@ -347,13 +342,12 @@
             const data = JSON.parse(el.textContent);
 
             title.textContent = 'Edit ' + data.sku;
-            fields.id.value = data.id;
+            // REQ-04: identity and the expected version travel in the action URL, never as form fields.
+            form.action = UPDATE_URL + (UPDATE_URL.indexOf('?') === -1 ? '?' : '&') + 'id=' + encodeURIComponent(data.id) + '&version=' + encodeURIComponent(data.version);
             fields.sku.value = data.sku;
             fields.name.value = data.name;
             fields.material.value = data.material;
             fields.category.value = data.category;
-            fields.stock.value = data.stock;
-            fields.status.value = data.status;
             fields.notes.value = data.notes;
             fields.vendorName.value = data.vendorName || '';
             fields.vendorContactPerson.value = data.vendorContactPerson || '';

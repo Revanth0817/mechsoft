@@ -23,7 +23,7 @@ public class DashboardService : IDashboardService
             .AsNoTracking()
             .Where(p => p.Status != StockStatus.InStock)
             .OrderBy(p => p.Stock)
-            .Select(p => new PartListItemDto(p.Id, p.Sku, p.Name, p.Material, p.Category, p.VendorName, p.Stock, p.Status, p.Photo != null))
+            .Select(p => new PartListItemDto(p.Id, p.Sku, p.Name, p.Material, p.Category, p.VendorName, p.Stock, p.Status, p.Photo != null, p.Version))
             .ToListAsync(ct);
 
         var recentDcs = await _context.DeliveryChallans

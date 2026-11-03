@@ -23,6 +23,10 @@ public class PartConfiguration : IEntityTypeConfiguration<Part>
         builder.Property(p => p.VendorEmail).HasMaxLength(200);
         builder.Property(p => p.VendorPhone).HasMaxLength(30);
 
+        // Optimistic concurrency: EF includes the original Version value in the UPDATE's WHERE
+        // clause and throws DbUpdateConcurrencyException if no row matched (someone else saved first).
+        builder.Property(p => p.Version).IsConcurrencyToken().HasDefaultValue(1);
+
         builder.HasMany(p => p.Specs)
             .WithOne(s => s.Part)
             .HasForeignKey(s => s.PartId)

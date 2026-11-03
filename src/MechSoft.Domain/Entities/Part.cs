@@ -20,6 +20,12 @@ public class Part
 
     public string? Notes { get; set; }
 
+    /// <summary>
+    /// Optimistic concurrency token. Starts at 1 and increases by 1 on every successful Inventory
+    /// stock/status update and every successful Product Details edit. Photo changes do not touch it.
+    /// </summary>
+    public int Version { get; set; } = 1;
+
     // Product photo, stored in the database so it is shared by everyone using the app.
     public byte[]? Photo { get; set; }
     public string? PhotoContentType { get; set; }

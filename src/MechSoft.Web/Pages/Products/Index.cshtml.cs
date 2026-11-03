@@ -1,16 +1,16 @@
-using System.ComponentModel.DataAnnotations;
 using MechSoft.Application.DTOs;
 using MechSoft.Application.Interfaces;
-using MechSoft.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace MechSoft.Web.Pages.Products;
 
-[RequestSizeLimit(MaxPhotoBytes)]
-[RequestFormLimits(MultipartBodyLengthLimit = MaxPhotoBytes)]
 public class IndexModel : PageModel
 {
+    // REQ-05: the 8 MB photo limit applies to the uploaded file only (checked below), so this page
+    // deliberately carries no [RequestSizeLimit] / [RequestFormLimits] - those would cap the whole
+    // multipart request (form fields + boundary overhead too) and refuse it with a bare HTTP 413
+    // before this handler ever runs, which is not wanted.
     private const long MaxPhotoBytes = 8_388_608; // 8 MB
     private static readonly HashSet<string> AllowedPhotoTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -44,40 +44,56 @@ public class IndexModel : PageModel
         await LoadAsync(ct);
     }
 
-    public async Task<IActionResult> OnPostSaveAsync(CancellationToken ct)
+    /// <summary>
+    /// REQ-04: creates a part from its editable fields only. No Id, Stock, Status or Version is read
+    /// from the form - the server assigns the next P-number, Stock 0, Out of Stock and Version 1.
+    /// </summary>
+    public async Task<IActionResult> OnPostCreateAsync(CancellationToken ct)
     {
-        if (!string.IsNullOrWhiteSpace(NewPart.VendorEmail) &&
-            !System.Net.Mail.MailAddress.TryCreate(NewPart.VendorEmail.Trim(), out _))
-        {
-            ModelState.AddModelError("NewPart.VendorEmail", "Enter a valid vendor email address.");
-        }
+        var result = await _partService.CreateAsync(BuildDto(), ct);
 
-        if (!ModelState.IsValid)
+        if (result.Outcome == PartSaveOutcome.ValidationFailed)
         {
+            foreach (var error in result.Errors) ModelState.AddModelError(error.Field, error.Message);
             await LoadAsync(ct);
             return Page();
         }
 
-        var specs = new List<PartSpecDto>();
-        for (var i = 0; i < NewPart.SpecLabels.Count; i++)
+        return RedirectToPage(new { selectedId = result.Id });
+    }
+
+    /// <summary>
+    /// REQ-04: the part identity and the expected version come from the URL (set by the Edit link,
+    /// never from a form field). REQ-02: a stale version is rejected, nothing is saved.
+    /// </summary>
+    public async Task<IActionResult> OnPostUpdateAsync([FromQuery] string id, [FromQuery] int version, CancellationToken ct)
+    {
+        var result = await _partService.UpdateAsync(id, version, BuildDto(), ct);
+
+        switch (result.Outcome)
         {
-            var label = NewPart.SpecLabels[i];
-            var value = i < NewPart.SpecValues.Count ? NewPart.SpecValues[i] : string.Empty;
-            if (!string.IsNullOrWhiteSpace(label))
-            {
-                specs.Add(new PartSpecDto(label.Trim(), value?.Trim() ?? string.Empty, i));
-            }
+            case PartSaveOutcome.ValidationFailed:
+                foreach (var error in result.Errors) ModelState.AddModelError(error.Field, error.Message);
+                SelectedId = id;
+                await LoadAsync(ct);
+                return Page();
+
+            case PartSaveOutcome.NotFound:
+                ModelState.AddModelError(string.Empty, "Part not found.");
+                SelectedId = id;
+                await LoadAsync(ct);
+                return Page();
+
+            case PartSaveOutcome.Conflict:
+                ModelState.AddModelError(string.Empty,
+                    "This part was changed by someone else after you opened it. Nothing was saved. Reload the page to see the latest values.");
+                SelectedId = id;
+                await LoadAsync(ct);
+                return Page();
+
+            default:
+                return RedirectToPage(new { selectedId = result.Id });
         }
-
-        var dto = new PartSaveDto(
-            string.IsNullOrWhiteSpace(NewPart.Id) ? null : NewPart.Id,
-            NewPart.Sku, NewPart.Name, NewPart.Material, NewPart.Category,
-            NewPart.Stock, NewPart.Status, NewPart.Notes, specs,
-            NewPart.VendorName?.Trim() ?? string.Empty, NewPart.VendorContactPerson?.Trim() ?? string.Empty,
-            NewPart.VendorEmail?.Trim() ?? string.Empty, NewPart.VendorPhone?.Trim() ?? string.Empty);
-
-        var savedId = await _partService.SaveAsync(dto, ct);
-        return RedirectToPage(new { selectedId = savedId });
     }
 
     public async Task<IActionResult> OnPostUploadPhotoAsync(string id, IFormFile? photo, CancellationToken ct)
@@ -94,7 +110,7 @@ public class IndexModel : PageModel
         }
         if (photo.Length > MaxPhotoBytes)
         {
-            PhotoError = $"Photo is too large (max {MaxPhotoBytes / 1024 / 1024} MB).";
+            PhotoError = "Photo is too large (max 8 MB).";
             return RedirectToPage(new { selectedId = id });
         }
 
@@ -120,6 +136,25 @@ public class IndexModel : PageModel
         return File(photo.Content, photo.ContentType);
     }
 
+    private PartSaveDto BuildDto()
+    {
+        // Trimming, required/length checks, email validation and dropping blank-label spec rows all
+        // happen centrally in PartService (REQ-07), so the raw posted values are passed through as-is -
+        // a direct request gets exactly the same result as the page (no client-side-only trimming).
+        var specs = new List<PartSpecDto>();
+        for (var i = 0; i < NewPart.SpecLabels.Count; i++)
+        {
+            var label = NewPart.SpecLabels[i];
+            var value = i < NewPart.SpecValues.Count ? NewPart.SpecValues[i] : string.Empty;
+            specs.Add(new PartSpecDto(label ?? string.Empty, value ?? string.Empty, i));
+        }
+
+        return new PartSaveDto(
+            NewPart.Sku, NewPart.Name, NewPart.Material, NewPart.Category, NewPart.Notes, specs,
+            NewPart.VendorName ?? string.Empty, NewPart.VendorContactPerson ?? string.Empty,
+            NewPart.VendorEmail ?? string.Empty, NewPart.VendorPhone ?? string.Empty);
+    }
+
     private async Task LoadAsync(CancellationToken ct)
     {
         Parts = await _partService.GetAllAsync(Search, ct);
@@ -130,43 +165,21 @@ public class IndexModel : PageModel
         }
     }
 
+    /// <summary>
+    /// The editable fields only (REQ-04): no Id, Stock, Status or Version property exists here, so
+    /// none can ever be posted to create a part or change its stock.
+    /// </summary>
     public class PartFormInput
     {
-        public string? Id { get; set; }
-
-        [Required, StringLength(50)]
         public string Sku { get; set; } = string.Empty;
-
-        [Required, StringLength(200)]
         public string Name { get; set; } = string.Empty;
-
-        [Required, StringLength(100)]
         public string Material { get; set; } = string.Empty;
-
-        [Required, StringLength(100)]
         public string Category { get; set; } = string.Empty;
-
-        [Range(0, int.MaxValue)]
-        public int Stock { get; set; }
-
-        // Stock and status are managed on the Inventory page; they are carried through here unchanged.
-        public StockStatus Status { get; set; } = StockStatus.OutOfStock;
-
-        [StringLength(200)]
         public string? VendorName { get; set; }
-
-        [StringLength(100)]
         public string? VendorContactPerson { get; set; }
-
-        [StringLength(200)]
         public string? VendorEmail { get; set; }
-
-        [StringLength(30)]
         public string? VendorPhone { get; set; }
-
-        [StringLength(2000)]
         public string? Notes { get; set; }
-
         public List<string> SpecLabels { get; set; } = new();
         public List<string> SpecValues { get; set; } = new();
     }
